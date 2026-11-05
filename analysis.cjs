@@ -20,4 +20,14 @@ assert.equal(run(`timeAverage(['23:30','00:30'])`),'00:00');assert.equal(run(`we
 // Distinct morning boundaries: no assumption that consecutive wake times are equal.
 run(`state={...blank(),years:'4',months:'0',dayWake:'07:00',wake:'11:00',asleep:'01:00',bedtime:'00:15',napMode:'intervals',naps:[{start:'08:00',end:'09:00'}],nightAwake:'0'}`);assert.equal(run('sleepStats().nap'),60);assert.equal(run('sleepStats().lastWake'),960);assert.equal(run('sleepStats().settling'),45);
 run(`state.napMode='none'`);assert.equal(run('sleepStats().lastWake'),1080);assert.equal(run('sleepStats().beforeSettling'),1035);
-console.log('PASS: 39 assertions: night subtraction, 3 naps, wake intervals, settling across midnight, overlaps, invalid/unknown, infant, legacy entry ages, 7-day window, missing days, deduplication, weekday/weekend, circular evening mean.');
+// Storage feedback must report failures honestly and preserve the diary.
+const statusNode={textContent:'',className:''},diaryStatus={textContent:''},warningNode={remove(){}};
+sandbox.document.getElementById=id=>id==='localSaveStatus'?statusNode:id==='storageWarning'?warningNode:id==='diarySaveStatus'?diaryStatus:null;
+let storedSnapshot;
+sandbox.localStorage.setItem=(key,value)=>{storedSnapshot=JSON.parse(value)};
+run(`state.profileId='20000000-0000-4000-8000-000000000019';state.journal=[{date:'2026-11-04',asleep:'21:00',wake:'07:00',nap:60,awake:0}];save()`);
+assert.equal(storedSnapshot.state.journal.length,1);assert.equal(storedSnapshot.state.profileId,'20000000-0000-4000-8000-000000000019');assert.match(statusNode.textContent,/сохраняются/);
+sandbox.localStorage.setItem=()=>{throw new Error('QuotaExceededError')};run('save()');assert.equal(run('storageError'),true);assert.match(statusNode.textContent,/Не удалось сохранить/);assert.match(diaryStatus.textContent,/Не удалось сохранить/);assert.equal(run('state.journal.length'),1);
+sandbox.localStorage.setItem=(key,value)=>{storedSnapshot=JSON.parse(value)};run('save()');assert.equal(run('storageError'),false);assert.match(statusNode.textContent,/сохраняются/);
+assert.match(diaryStatus.textContent,/сохраняются/);
+console.log('PASS: 49 assertions: sleep calculations, legacy data, weekly coverage, storage success/failure feedback and diary preservation.');
