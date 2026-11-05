@@ -1,28 +1,26 @@
-# Simple workflow for deploying static content to GitHub Pages
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      cancel_deployment:
+        description: "Optional: SHA or ID of a stale Pages deployment to cancel before publishing"
+        required: false
+        type: string
+        default: ""
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
@@ -31,12 +29,39 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Check sleep calculations
+        run: node analysis.cjs
+      - name: Cancel explicitly selected stale Pages deployment
+        if: github.event_name == 'workflow_dispatch' && inputs.cancel_deployment != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STALE_DEPLOYMENT: ${{ inputs.cancel_deployment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$STALE_DEPLOYMENT" =~ ^([[:xdigit:]]{40}|[0-9]+)$ ]]; then
+            echo "Expected a deployment SHA or numeric ID."
+            exit 1
+          fi
+          endpoint="repos/${GITHUB_REPOSITORY}/pages/deployments/${STALE_DEPLOYMENT}"
+          gh api --method POST -H 'X-GitHub-Api-Version: 2026-03-10' "${endpoint}/cancel"
+          for attempt in {1..12}; do
+            status=$(gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$endpoint" --jq '.status')
+            echo "Pages deployment status: $status"
+            case "$status" in
+              succeed|succeeded|canceled|cancelled|failed|failure|errored)
+                exit 0
+                ;;
+            esac
+            sleep 5
+          done
+          echo "The old Pages deployment has not stopped; refusing to overlap deployments."
+          exit 1
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
           path: '.'
       - name: Deploy to GitHub Pages
         id: deployment
