@@ -49,7 +49,7 @@ jobs:
             status=$(gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$endpoint" --jq '.status')
             echo "Pages deployment status: $status"
             case "$status" in
-              succeed|succeeded|canceled|cancelled|failed|failure|errored)
+              succeed|succeeded|canceled|cancelled|failed|failure|errored|deployment_cancelled|deployment_failed|deployment_succeeded)
                 exit 0
                 ;;
             esac
