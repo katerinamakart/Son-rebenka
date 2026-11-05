@@ -1,0 +1,11 @@
+{
+  "name": "son-rebenka",
+  "private": true,
+  "version": "1.7.0",
+  "scripts": {
+    "test": "node mobile.cjs && node edge-cases.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
