@@ -19,4 +19,5 @@ run(`var entries=Array.from({length:7},(_,i)=>({date:'2026-11-'+String(i+2).padS
 assert.equal(run(`timeAverage(['23:30','00:30'])`),'00:00');assert.equal(run(`weeklyData(entries.concat(entries[1]),'2026-11-08').rows.length`),7);assert.equal(run(`weeklyData(entries,'2026-10-01').complete.length`),0);
 // Distinct morning boundaries: no assumption that consecutive wake times are equal.
 run(`state={...blank(),years:'4',months:'0',dayWake:'07:00',wake:'11:00',asleep:'01:00',bedtime:'00:15',napMode:'intervals',naps:[{start:'08:00',end:'09:00'}],nightAwake:'0'}`);assert.equal(run('sleepStats().nap'),60);assert.equal(run('sleepStats().lastWake'),960);assert.equal(run('sleepStats().settling'),45);
-console.log('PASS: 37 assertions: night subtraction, 3 naps, wake intervals, settling across midnight, overlaps, invalid/unknown, infant, legacy entry ages, 7-day window, missing days, deduplication, weekday/weekend, circular evening mean.');
+run(`state.napMode='none'`);assert.equal(run('sleepStats().lastWake'),1080);assert.equal(run('sleepStats().beforeSettling'),1035);
+console.log('PASS: 39 assertions: night subtraction, 3 naps, wake intervals, settling across midnight, overlaps, invalid/unknown, infant, legacy entry ages, 7-day window, missing days, deduplication, weekday/weekend, circular evening mean.');
