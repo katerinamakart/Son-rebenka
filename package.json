@@ -1,9 +1,9 @@
 {
   "name": "son-rebenka",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.8.1",
   "scripts": {
-    "test": "node mobile.cjs && node edge-cases.cjs"
+    "test": "node mobile.cjs && node edge-cases.cjs && node supplement.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"
