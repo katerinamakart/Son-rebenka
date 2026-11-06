@@ -31,3 +31,14 @@ sandbox.localStorage.setItem=()=>{throw new Error('QuotaExceededError')};run('sa
 sandbox.localStorage.setItem=(key,value)=>{storedSnapshot=JSON.parse(value)};run('save()');assert.equal(run('storageError'),false);assert.match(statusNode.textContent,/сохраняются/);
 assert.match(diaryStatus.textContent,/сохраняются/);
 console.log('PASS: 49 assertions: sleep calculations, legacy data, weekly coverage, storage success/failure feedback and diary preservation.');
+
+// Primary-source attribution at each age boundary, independent from the sleep arithmetic.
+for(const [months,min,max,source] of [[0,14,17,'who'],[3,14,17,'who'],[4,12,16,'who'],[11,12,16,'who'],[12,11,14,'aasm'],[35,11,14,'aasm'],[36,10,13,'aasm'],[71,10,13,'aasm'],[72,9,12,'aasm'],[120,9,12,'aasm']]){
+ run(`state.years='${Math.floor(months/12)}';state.months='${months%12}'`);
+ assert.deepEqual(JSON.parse(JSON.stringify(run('norm()'))),{min,max,label:run('norm().label'),...(months<4?{caution:true}:{}),source});
+ assert.match(run('normCitation()'),new RegExp(source==='who'?'who.int':'PMC4877308'));
+}
+const science=fs.readFileSync('science.html','utf8');
+for(const href of [...science.matchAll(/href="#([^"]+)"/g)].map(m=>m[1]))assert.ok(science.includes(`id="${href}"`),`Missing scientific-page target: ${href}`);
+for(const href of [...html.matchAll(/science.html#([a-z0-9]+)/g)].map(m=>m[1]))assert.ok(science.includes(`id="${href}"`),`Missing result target: ${href}`);
+console.log('PASS: primary sources for 10 age boundaries and all static scientific-page anchors.');
