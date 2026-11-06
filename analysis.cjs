@@ -66,3 +66,13 @@ run(`state.nightAwake='0';state.asleep='23:30';state.napMode='none'`);assert.equ
 run(`state.breathing='yes'`);assert.equal(run(`resultAssessment().headline`),'Обсудите дыхание во сне с врачом');
 run(`state={...blank(),years:'0',months:'2',dailySleep:'16'}`);assert.equal(run(`resultAssessment().duration.tone`),'unknown');
 console.log('PASS: compact result colors distinguish duration, long settling, unknown observations, short sleep and breathing concerns.');
+
+// Four requested duration scenarios. Other issues never turn adequate duration red.
+for(const [asleep,awake,expected] of [['21:00','0','good'],['01:00','0','bad'],['18:00','0','watch'],['21:00','unknown','unknown']]){
+ run(`state={...blank(),years:'4',months:'0',asleep:'${asleep}',wake:'07:00',bedtime:'17:30',nightAwake:'${awake}',napMode:'legacy',nap:'60',dayMood:'good'}`);
+ assert.equal(run('durationSummary(resultAssessment()).tone'),expected);
+ assert.equal(run(`sleepDurationScale(resultAssessment()).includes('class="sleepScaleMarker"')`),expected!=='unknown');
+ if(expected==='unknown'){assert.notEqual(run('resultAssessment().quality.tone'),'good');assert.notEqual(run('resultAssessment().schedule.tone'),'good');}
+}
+run(`state.years=''`);assert.equal(run('durationSummary(resultAssessment()).tone'),'unknown');
+console.log('PASS: normal / short / long / incomplete duration status, actual scale marker and incomplete-data safeguards.');
