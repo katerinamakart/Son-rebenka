@@ -1,7 +1,7 @@
 {
   "name": "son-rebenka",
   "private": true,
-  "version": "1.10.1",
+  "version": "1.10.2",
   "scripts": {
     "test": "node analysis.cjs",
     "test:mobile": "node mobile.cjs && node edge-cases.cjs && node supplement.cjs"
