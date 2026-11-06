@@ -42,3 +42,17 @@ const science=fs.readFileSync('science.html','utf8');
 for(const href of [...science.matchAll(/href="#([^"]+)"/g)].map(m=>m[1]))assert.ok(science.includes(`id="${href}"`),`Missing scientific-page target: ${href}`);
 for(const href of [...html.matchAll(/science.html#([a-z0-9]+)/g)].map(m=>m[1]))assert.ok(science.includes(`id="${href}"`),`Missing result target: ${href}`);
 console.log('PASS: primary sources for 10 age boundaries and all static scientific-page anchors.');
+
+// Comparison must not confuse unknown, old summed records and known no-nap days.
+for(const [month,max] of [[3,0],[4,4],[6,3],[9,2],[15,2],[24,1],[36,1],[60,0]])assert.equal(run(`scheduleAgeGuide(${month}).max`),max);
+run(`state={...blank(),years:'4',months:'0',dayWake:'07:00',wake:'07:00',asleep:'21:00',bedtime:'20:00',nightAwake:'0',napMode:'intervals',naps:[{start:'16:00',end:'18:00'}]}`);
+assert.equal(run(`regimeComparison().rows.find(r=>r.stage==='1 дневной сон').actual`),'16:00–18:00');
+assert.match(run(`regimeComparison().rows.find(r=>r.stage==='1 дневной сон').comment`),/2 ч/);
+assert.match(run(`regimeComparison().rows.find(r=>r.stage==='Фактическое засыпание').guide`),/23:00/);
+run(`state.years='2';state.napMode='unknown'`);assert.match(run(`regimeComparison().rows.find(r=>r.stage==='1 дневной сон').comment`),/не означает/);
+run(`state.napMode='legacy';state.nap='60'`);assert.match(run(`regimeComparison().rows.find(r=>r.stage==='1 дневной сон').comment`),/пропуск не определяем/);
+run(`state.napMode='none';state.asleep='23:00'`);assert.match(run(`regimeComparison().rows.find(r=>r.stage==='1 дневной сон').comment`),/Возможный пропуск/);assert.equal(run(`regimeComparison().rows.find(r=>r.stage==='Фактическое засыпание').tone`),'attention');
+run(`state.years='6'`);assert.equal(run(`regimeComparison().rows.filter(r=>/дневной сон/.test(r.stage)).length`),0);
+run(`state.years='0';state.months='2'`);assert.match(run(`regimeComparison().rows.find(r=>r.stage==='Фактическое засыпание').guide`),/нет/);
+assert.ok(science.includes('id="regime-method"'));
+console.log('PASS: month-specific comparison, late nap signal, computed sleep boundary, missing vs unknown data, old entries and infant/school-age rows.');
