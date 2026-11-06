@@ -40,7 +40,7 @@ for(const [months,min,max,source] of [[0,14,17,'who'],[3,14,17,'who'],[4,12,16,'
 }
 const science=fs.readFileSync('science.html','utf8');
 for(const href of [...science.matchAll(/href="#([^"]+)"/g)].map(m=>m[1]))assert.ok(science.includes(`id="${href}"`),`Missing scientific-page target: ${href}`);
-for(const href of [...html.matchAll(/science.html#([a-z0-9]+)/g)].map(m=>m[1]))assert.ok(science.includes(`id="${href}"`),`Missing result target: ${href}`);
+for(const href of [...html.matchAll(/science.html#([a-z0-9-]+)/g)].map(m=>m[1]))assert.ok(science.includes(`id="${href}"`),`Missing result target: ${href}`);
 console.log('PASS: primary sources for 10 age boundaries and all static scientific-page anchors.');
 
 // Comparison must not confuse unknown, old summed records and known no-nap days.
@@ -56,3 +56,13 @@ run(`state.years='6'`);assert.equal(run(`regimeComparison().rows.filter(r=>/дн
 run(`state.years='0';state.months='2'`);assert.match(run(`regimeComparison().rows.find(r=>r.stage==='Фактическое засыпание').guide`),/нет/);
 assert.ok(science.includes('id="regime-method"'));
 console.log('PASS: month-specific comparison, late nap signal, computed sleep boundary, missing vs unknown data, old entries and infant/school-age rows.');
+
+// A normal duration must not hide long settling; unknown quality stays unknown.
+run(`state={...blank(),years:'4',months:'0',dayWake:'07:40',wake:'07:00',asleep:'21:08',bedtime:'20:00',nightAwake:'0',napMode:'intervals',naps:[{start:'12:00',end:'15:00'}],dayMood:'good'}`);
+assert.equal(run(`resultAssessment().duration.tone`),'good');assert.equal(run(`resultAssessment().quality.tone`),'bad');assert.equal(run(`resultAssessment().headline`),'Стоит поправить укладывание');assert.equal(run(`resultAssessment().d.settling`),68);
+run(`state.asleep='20:20'`);assert.equal(run(`resultAssessment().quality.tone`),'good');
+run(`state.nightAwake='unknown';state.dayMood='unknown'`);assert.equal(run(`resultAssessment().duration.tone`),'unknown');assert.equal(run(`resultAssessment().quality.tone`),'unknown');
+run(`state.nightAwake='0';state.asleep='23:30';state.napMode='none'`);assert.equal(run(`resultAssessment().duration.tone`),'bad');
+run(`state.breathing='yes'`);assert.equal(run(`resultAssessment().headline`),'Обсудите дыхание во сне с врачом');
+run(`state={...blank(),years:'0',months:'2',dailySleep:'16'}`);assert.equal(run(`resultAssessment().duration.tone`),'unknown');
+console.log('PASS: compact result colors distinguish duration, long settling, unknown observations, short sleep and breathing concerns.');
