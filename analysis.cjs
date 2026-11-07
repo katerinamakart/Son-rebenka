@@ -76,3 +76,88 @@ for(const [asleep,awake,expected] of [['21:00','0','good'],['01:00','0','bad'],[
 }
 run(`state.years=''`);assert.equal(run('durationSummary(resultAssessment()).tone'),'unknown');
 console.log('PASS: normal / short / long / incomplete duration status, actual scale marker and incomplete-data safeguards.');
+
+async function checkKnowledgeIntegration(){
+ const code=fs.readFileSync('sleep-knowledge.js','utf8');
+ const aasm={id:'aasm',title:'AASM',url:'https://example.org/sleep',is_published:true};
+ const draft={...aasm,id:'draft',is_published:false};
+ const bands=[[0,4,840,1020],[4,12,720,960],[12,36,660,840],[36,72,600,780],[72,132,540,720]];
+ const norms=bands.map(([age_min_months,age_max_months_exclusive,min_minutes,max_minutes])=>({
+  age_min_months,age_max_months_exclusive,min_minutes,max_minutes,source_id:'aasm',is_published:true
+ }));
+ const makeRule=(trigger_key,priority,age_min_months=4,age_max_months_exclusive=132)=>({
+  id:trigger_key,trigger_key,priority,age_min_months,age_max_months_exclusive,title:trigger_key,
+  parent_explanation:'Наблюдение',recommendation:'Совет',source_ids:['aasm'],is_published:true
+ });
+ const rows={
+  sources:[aasm,draft],
+  age_norms:norms,
+  guidance:[
+   makeRule('total_sleep_in_range',60),makeRule('total_sleep_below',80),makeRule('total_sleep_above',60),
+   makeRule('late_nap_with_bedtime_delay',50,12,72),makeRule('repeated_long_settling',65,12),
+   makeRule('sleep_fields_missing',100,0),makeRule('sleep_breathing_warning',1,0),
+   makeRule('frequent_night_wakings',70),makeRule('tired_day_mood',50,12),
+   makeRule('age_under_4_months',100,0,4),makeRule('screens_close_to_bedtime',55,12),
+   makeRule('ritual_absent_or_inconsistent',55),
+   {...makeRule('total_sleep_in_range',999),id:'unpublished',is_published:false},
+   {...makeRule('total_sleep_in_range',999),id:'unpublished-source',source_ids:['draft']}
+  ]
+ };
+ const requests=[];
+ function loadModule(fetch){
+  const window={};
+  vm.runInNewContext(code,{window,fetch,URL,URLSearchParams,AbortController,setTimeout,clearTimeout});
+  return window.SonSleepKnowledge;
+ }
+ const kb=loadModule(async (url,options)=>{
+  requests.push({url,options});
+  return {ok:true,json:async()=>rows[url.pathname.split('sleep_kb_')[1]]};
+ });
+ assert.equal(await kb.load('https://example.org','public-test-key'),true);
+ assert.equal(requests.length,3);
+ for(const {url,options} of requests){
+  assert.equal(url.searchParams.get('is_published'),'eq.true');
+  assert.deepEqual([...url.searchParams.keys()].sort(),['is_published','select']);
+  assert.equal(options.method,'GET');
+  assert.equal(options.credentials,'omit');
+  assert.equal(options.body,undefined);
+  assert.equal(options.headers.Authorization,undefined);
+ }
+ sandbox.window={SonSleepKnowledge:kb};
+ for(const [min,max,low,high] of bands){
+  for(const age of [min,max-1]){
+   assert.equal(run(`norm(${age}).minMinutes`),low);
+   assert.equal(run(`norm(${age}).maxMinutes`),high);
+  }
+ }
+ const base="state={...blank(),years:'4',wake:'07:00',asleep:'21:00',bedtime:'20:30',nightAwake:'0',napMode:'none'}";
+ function matched(changes=''){
+  run(base+';'+changes);
+  const list=run('window.SonSleepKnowledge.suggestions(resultAssessment(),state,napMode(state))');
+  return Array.from(list,rule=>rule.id);
+ }
+ assert.deepEqual(matched(),['total_sleep_in_range']);
+ assert.deepEqual(matched("state.asleep='22:00'").slice(0,2),['total_sleep_below','repeated_long_settling']);
+ assert.ok(matched("state.asleep='17:00';state.bedtime='16:30'").includes('total_sleep_above'));
+ assert.ok(matched("state.napMode='intervals';state.naps=[{start:'16:00',end:'18:00'}];state.bedtime='20:00'").includes('late_nap_with_bedtime_delay'));
+ assert.ok(!matched("state.dayWake='18:00';state.bedtime='20:00'").includes('late_nap_with_bedtime_delay'));
+ assert.equal(matched("state.nightAwake='unknown';state.breathing='yes'")[0],'sleep_breathing_warning');
+ assert.ok(matched("state.nightAwake='unknown'").includes('sleep_fields_missing'));
+ assert.ok(matched("state.nightWakings='3';state.dayMood='tired'").includes('frequent_night_wakings'));
+ assert.ok(matched("state.dayMood='tired'").includes('tired_day_mood'));
+ assert.ok(matched("state.screenTime='late'").includes('screens_close_to_bedtime'));
+ assert.ok(matched("state.rituals=['none']").includes('ritual_absent_or_inconsistent'));
+ assert.ok(matched("state.years='0';state.months='2'").includes('age_under_4_months'));
+ matched();
+ assert.match(run('resultContent()'),/Советы из базы знаний/);
+ assert.doesNotMatch(run('resultContent()'),/Возможные шаги/);
+ assert.equal(requests.length,3,'Matching and rendering must not send more requests');
+ const offline=loadModule(async()=>{throw new Error('offline');});
+ assert.equal(await offline.load('https://example.org','public-test-key'),false);
+ sandbox.window.SonSleepKnowledge=offline;
+ assert.equal(run('norm().min'),10);
+ assert.match(run('resultContent()'),/Возможные шаги/);
+ assert.doesNotMatch(run('resultContent()'),/Советы из базы знаний/);
+ console.log('PASS: published KB access, age boundaries, local matching, alert priority, source filtering and offline fallback.');
+}
+checkKnowledgeIntegration().catch(error=>{console.error(error);process.exitCode=1;});
