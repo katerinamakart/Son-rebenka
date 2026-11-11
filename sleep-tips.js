@@ -25,7 +25,8 @@ function mount(){
  const screen=app.dataset.sleepScreen||'home';
  if(!Object.hasOwn(first,screen)){app.classList.remove('hasSleepTips');return;}
  if(current!==screen){current=screen;hidden=false;index=Math.max(0,cards.findIndex(c=>c.id===first[screen]));}
- app.classList.add('hasSleepTips');
+ const homeTips=screen==='home'?app.querySelector('#homeTips'):null;
+ app.classList.toggle('hasSleepTips',!homeTips);
  const show=document.createElement('button');show.className='tipShow';show.type='button';show.setAttribute('aria-label','Как помочь ребёнку со сном? Посмотреть 8 подсказок');show.innerHTML='<span class=tipTeaserIcon aria-hidden=true>☾</span><span class=tipTeaserText><strong>Как помочь ребёнку со сном?</strong><span>8 коротких подсказок с картинками</span><b>Посмотреть <span aria-hidden=true>→</span></b></span>';show.hidden=!hidden;
  const box=document.createElement('aside');box.className='sleepTips';box.hidden=hidden;box.setAttribute('aria-label','Подсказки с иллюстрациями');box.setAttribute('aria-roledescription','карусель');
  box.innerHTML='<h2>Подсказки о сне</h2><figure><div class="tipArt" tabindex="0" aria-label="Иллюстрация. Листать стрелками влево и вправо"></div><figcaption></figcaption></figure><div class="tipNav"><button type="button" aria-label="Предыдущая подсказка">‹</button><span class="tipCount" aria-live="polite" aria-atomic="true"></span><button type="button" aria-label="Следующая подсказка">›</button></div><p class="tipSource"><a href="science.html#routine">Научная основа подсказок</a></p><button type="button" class="tipHide">Скрыть подсказки</button>';
@@ -37,7 +38,13 @@ function mount(){
  let touch=null;box.querySelector('.tipArt').addEventListener('touchstart',e=>{const t=e.changedTouches[0];touch={x:t.clientX,y:t.clientY};},{passive:true});box.querySelector('.tipArt').addEventListener('touchend',e=>{if(!touch)return;const t=e.changedTouches[0],dx=t.clientX-touch.x,dy=t.clientY-touch.y;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy))step(dx<0?1:-1);touch=null;},{passive:true});
  box.querySelector('.tipHide').onclick=()=>{hidden=true;box.hidden=true;show.hidden=false;show.focus();};show.onclick=()=>{hidden=false;box.hidden=false;show.hidden=true;box.querySelector('.tipArt').focus();};
  image.onerror=()=>{box.querySelector('.tipArt').hidden=true;};
- app.append(box,show);render();
+ if(homeTips){
+  box.querySelector('h2').remove();
+  box.querySelector('.tipHide').remove();
+  homeTips.append(box);
+  homeTips.hidden=false;
+ }else app.append(box,show);
+ render();
 }
 const observer=new MutationObserver(mount);observer.observe(app,{childList:true});mount();
 })();
